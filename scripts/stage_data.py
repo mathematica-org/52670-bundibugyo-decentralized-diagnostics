@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 BDBV_REPO = "https://github.com/INRB-UMIE/BDBV2026-Data.git"
 BDBV_COMMIT = "60f67015625a9f1cf54d9da5339926121d90b72d"
+# Upstream CI tags each build that passes its QA gate (`tools.qa`) as
+# `build-<date>-<sha>`; `--bdbv-commit ""` checks out the newest such tag.
+BDBV_RELEASE_TAGS = "refs/tags/build-*"
 HDX_PACKAGES = (
     "bd5781f3-9c6a-427a-955b-ce2b59def8c3",
     "f3660479-fb8d-4a74-baa7-09d2d24c8e0d",
@@ -70,14 +73,46 @@ def verify(path: Path, expected: str, label: str, allow_drift: bool) -> None:
     print(f"WARNING: {message}\n    Continuing because --allow-hdx-drift was passed.")
 
 
-def stage_inrb(force: bool = False) -> None:
+def latest_release(repo: Path) -> str:
+    """Return the commit of the newest QA-verified upstream release tag."""
+    print(f"+ resolving newest {BDBV_RELEASE_TAGS} tag")
+    tag = subprocess.run(
+        [
+            "git",
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--count=1",
+            "--format=%(refname:short)",
+            BDBV_RELEASE_TAGS,
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if not tag:
+        raise SystemExit(f"ERROR: no {BDBV_RELEASE_TAGS} tags found in {repo}")
+    commit = subprocess.run(
+        ["git", "rev-parse", f"{tag}^{{commit}}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    print(f"newest verified release: {tag} ({commit})")
+    return commit
+
+
+def stage_inrb(commit: str = BDBV_COMMIT, force: bool = False) -> None:
     dest = DATA / "BDBV2026-Data"
     if force and dest.exists():
         shutil.rmtree(dest)
     if not dest.exists():
         run(["git", "clone", BDBV_REPO, str(dest)])
     run(["git", "fetch", "--tags", "origin"], cwd=dest)
-    run(["git", "checkout", BDBV_COMMIT], cwd=dest)
+    if not commit:
+        commit = latest_release(dest)
+    run(["git", "checkout", commit], cwd=dest)
 
 
 def download(url: str, dest: Path) -> None:
@@ -170,6 +205,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
+        "--bdbv-commit",
+        default=BDBV_COMMIT,
+        help=(
+            "INRB-UMIE/BDBV2026-Data commit to check out (default: %(default)s). "
+            'Pass "" to check out the newest QA-verified release tag (build-*).'
+        ),
+    )
+    parser.add_argument(
         "--skip-hdx",
         action="store_true",
         help="Only clone/check out INRB-UMIE/BDBV2026-Data.",
@@ -184,7 +227,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    stage_inrb(force=args.force)
+    stage_inrb(commit=args.bdbv_commit, force=args.force)
     if not args.skip_hdx:
         stage_hdx(force=args.force, allow_drift=args.allow_hdx_drift)
 
