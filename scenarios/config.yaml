@@ -726,6 +726,9 @@ intervention:
     # quoted with it.
     - {name: t090s25n2, nat_scale_T:  90.0, nat_scale_min: 0.25, nat_scale_n: 2.0,
        role: primary}
+    # NO-CLOCK CONTRAST: S_min = 1 makes S_nat == 1 exactly over the whole forecast.
+    - {name: noclock, nat_scale_T:  90.0, nat_scale_min: 1.0, nat_scale_n: 2.0,
+       role: contrast}
 
   # --- forward horizon ---
   # cutoff = `horizon_date` (2026-08-02), taken from the block above; never duplicated here.
