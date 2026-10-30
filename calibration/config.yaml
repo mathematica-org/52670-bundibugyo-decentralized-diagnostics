@@ -65,7 +65,7 @@ brake_reforms: [R_floor]
 #
 seed: 20260720
 n_draws: 200
-n_workers: 176                 # emcee's red-blue split cannot finish a half-step until its
+n_workers: 96                 # emcee's red-blue split cannot finish a half-step until its
                                # SLOWEST walker returns, and evaluation cost here is heavy-tailed
                                # (reject-and-redraw costs M/q(theta) attempts), so a single chain
                                # realises only ~25% CPU on a big box. Set this to the core count
